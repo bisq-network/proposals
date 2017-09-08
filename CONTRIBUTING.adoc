@@ -1,0 +1,1 @@
+See the https://github.com/bisq-network/docs/blob/master/CONTRIBUTING.adoc[general bisq-network contributing guidelines].
