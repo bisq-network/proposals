@@ -1,0 +1,95 @@
+= API to enable automated trading
+:toc:
+
+....
+  BISQ: ??
+  Layer: External
+  Title: API to enable automated trading
+  Author: Mike Rosseel <mike.rosseel@gmail.com>
+  Comments-Summary: No comments yet.
+  Comments-URI: TODO
+  Status: Draft
+  Created: 2017-09-13
+  License: GPL Version 3
+....
+
+== Abstract
+
+Every succesful trade in Bisq needs a minimum of 6 manual interventions:
+
+* make offer
+* take offer
+* payment started
+* payment received
+* move funds to wallet of maker
+* move funds to wallet of taker
+
+In this proposal a mechanism is described to automate this process, thereby eliminating
+all manual interventions needed to conclude a trade succesfully.
+
+
+== Goals
+
+The immediate goal of this proposal is to offer an API that enables automation of crypto -> crypto
+trades.
+
+NOTE: Fiat pairs can also be automated, but because there aren't many banks currently offering
+their own API's this proposal will not focus on it.
+
+== Overview
+
+The API module will be a separate module which will depend on the core bisq modules.
+
+There are 2 interfaces in the API module:
+
+* Bisq \<\=> internal API
+* internal API \<\=> REST API
+
+This decoupling is important for two reasons: decouple REST API from Bisq changes and make it easy to add other API's if needed such as JSON RPC, protobuffer, ... .
+
+== Example REST API
+
+....
+GET /api/v1/account_list
+GET /api/v1/currency_list
+GET /api/v1/market_list
+GET /api/v1/offer_list
+GET /api/v1/offer_detail
+DELETE /api/v1/offer_cancel
+GET /api/v1/offer_make
+GET /api/v1/offer_take
+GET /api/v1/trade_detail
+GET /api/v1/trade_list
+GET /api/v1/payment_started
+GET /api/v1/payment_received
+GET /api/v1/move_funds_to_bisq_wallet
+GET /api/v1/wallet_detail
+GET /api/v1/wallet_addresses
+GET /api/v1/wallet_tx_list
+....
+
+Some of these REST calls will have further parameters to customize the responses, these parameters will not be documented in this proposal.
+
+== Technical details
+
+Language:: Java 8 (in line with bisq project)
+REST framework::
+* http://www.dropwizard.io/[Dropwizard] => Java framework for developing ops-friendly, high-performance, RESTful web services
+* https://swagger.io/[Swagger] => tools for the OpenAPI Specification, enables export of REST API in a standard format. This in turn allows us to have pretty API docs and autogenerating API clients.
+
+
+== Open issues
+
+* how to export the API documentation, where to publish it
+
+
+== Glossary
+
+API:: a set of functions and procedures that allow the creation of applications which access the features or data of an operating system, application, or other service.
+REST:: REST or RESTful web services is a way of providing interoperability between computer systems on the Internet. See https://en.wikipedia.org/wiki/Representational_state_transfer[REST wikipedia entry].
+
+== References
+
+* https://swagger.io/[Swagger]
+* https://swagger.io/swagger-codegen/[Swagger code generation]
+* https://en.wikipedia.org/wiki/Representational_state_transfer[REST wikipedia entry]
