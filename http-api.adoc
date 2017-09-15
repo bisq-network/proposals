@@ -15,7 +15,7 @@
 
 == Abstract
 
-Every succesful trade in Bisq needs a minimum of 6 manual interventions:
+Every successful trade in Bisq needs a minimum of 6 manual interventions:
 
 * make offer
 * take offer
@@ -25,7 +25,7 @@ Every succesful trade in Bisq needs a minimum of 6 manual interventions:
 * move funds to wallet of taker
 
 In this proposal a mechanism is described to automate this process, thereby eliminating
-all manual interventions needed to conclude a trade succesfully.
+all manual interventions needed to conclude a trade successfully.
 
 
 == Goals
@@ -38,7 +38,7 @@ their own API's this proposal will not focus on it.
 
 == Overview
 
-The API module will be a separate module which will depend on the core bisq modules.
+The API module will be a separate module which will depend on the core Bisq modules.
 
 There are 2 interfaces in the API module:
 
@@ -70,6 +70,52 @@ GET /api/v1/wallet_tx_list
 
 Some of these REST calls will have further parameters to customize the responses, these parameters will not be documented in this proposal.
 
+== Example usage
+
+To show how to use this REST API, this section will give high-level examples
+on how to create a simple maker and taker trading bot.
+
+These examples presume that your bisq has been set up with the necessary
+accounts, and that there's enough bitcoin to pay fees, use as collateral,
+sell, ... .
+
+=== Trading bot: Selling BTC for XMR
+
+* Gather info
+** collect all active bisq accounts using */account_list*
+** select the XMR _account_id_ by parsing the account_list result
+** get the current offers, using */offer_list*. A bot could use this information to decide on the best offer price.
+** optionally: get external prices for bitcoin and XMR
+* Make offer
+** use the _account_id_ and the XMR/BTC pair to create an offer using */offer_create*.
+Use either an external price, a price derived from the other Bisq offers or use a % distance from the Bisq price.
+* Detect Offer take
+** check the state of your offer using the _offer_id_ and wait till it's taken, using */offer_detail*
+** check that in the */trade_list* result, a trade with your _offer_id_ is present.
+* Advance trade
+** using an external blockchain explorer or full node, determine when the XMR payment
+has arrived to advance the payment using */payment_received*
+* Withdraw
+** the XMR is in your own wallet, but you can withdraw the trading collateral
+ using */move_funds_to_bisq_wallet*
+
+=== Trading bot: Buying BTC for XMR (taking the offer created by the previous bot)
+
+* Gather info
+** collect all active bisq accounts using */account_list*
+** select the XMR _account_id_ by parsing the account_list result
+** get the current offers, using */offer_list*. A bot could use this information to decide on the best offer price.
+** optionally: get external prices for bitcoin and XMR
+* Take offer
+** use the _offer_id_ and the XMR/BTC pair to create an offer using */offer_take*.
+* Detect Trade id
+** check that in the */trade_list* result, a trade with your _offer_id_ is present, store this as _trade_id_.
+* Advance trade
+** using an external wallet, pay the required XMR to the address in the trade.
+** call  */payment_started*
+* Withdraw
+** you can withdraw the BTC into your bisq wallet using */move_funds_to_bisq_wallet*
+
 == Technical details
 
 Language:: Java 8 (in line with bisq project)
@@ -81,7 +127,6 @@ REST framework::
 == Open issues
 
 * how to export the API documentation, where to publish it
-
 
 == Glossary
 
