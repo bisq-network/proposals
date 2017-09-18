@@ -43,10 +43,10 @@ We propose an age of 2 months to be considered safe. It seems very unlikely that
 When the user has never traded or if their account age is less than 2 months their trade amount will be limited.
 
 We suggest following limits:
-1. Account never used in trade: 25% of the default limit (e.g. 0.125 BTC for a default limit of 0.5 BTC)
-2. Trade age < 1 months: 50% of the default limit (e.g. 0.25 BTC for a default limit of 0.5 BTC)
-3. Trade age 1 - 2 months: 75% of the default limit (e.g. 0.375 BTC for a default limit of 0.5 BTC)
-4. Trade age > 2 months: Default limit will be applied (e.g. 0.5 BTC)
+. Account never used in trade: 25% of the default limit (e.g. 0.125 BTC for a default limit of 0.5 BTC)
+. Trade age < 1 months: 50% of the default limit (e.g. 0.25 BTC for a default limit of 0.5 BTC)
+. Trade age 1 - 2 months: 75% of the default limit (e.g. 0.375 BTC for a default limit of 0.5 BTC)
+. Trade age > 2 months: Default limit will be applied (e.g. 0.5 BTC)
 
 Please note that in future the trade amount limits will be probably derived from the current market price and the target will be likely about 1000 USD.
 
@@ -77,10 +77,10 @@ The user icon in the offerbook will contain an additional colored sub-icon for r
 
 4 different icons for the 4 states will be used:
 
-1. Account never used in trade
-2. Trade age < 1 months
-3. Trade age 1 - 2 months
-4. Trade age > 2 months
+. Account never used in trade
+. Trade age < 1 months
+. Trade age 1 - 2 months
+. Trade age > 2 months
 
 
 == Non goals
