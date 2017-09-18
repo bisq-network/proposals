@@ -110,4 +110,4 @@ We don't consider that this would add extra security to the model because a stol
 
 == References
 
-* [1] https://forum.bisq.io/t/new-requirement-for-payment-accounts-with-charge-back-risk/2376/65
+[1] https://forum.bisq.io/t/new-requirement-for-payment-accounts-with-charge-back-risk/2376/65
