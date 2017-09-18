@@ -1,0 +1,106 @@
+== Payment account age based trade amount limits
+:toc:
+
+....
+  Bisq-IP: 2
+  Layer: Exchange
+  Title: Payment account age based trade amount limits
+  Author: Manfred Karrer <mk@nucleo.io>
+  Comments-Summary: No comments yet.
+  Comments-URI: TODO
+  Status: Draft
+  Created: 2017-09-14
+  License: GPL Version 3
+....
+
+== Abstract
+
+This proposal describes a verification model for the age of the first trade with a certain payment account as protection against a fraud scheme in which a criminal has obtained illegal access of a foreign bank account and tries to buy Bitcoin with the stolen funds.
+
+The victim of the stolen bank account will likely contact his bank and initiate a bank charge-back.
+The Bitcoin seller would in such a case be at risk to lose the received payment in Fiat currency.
+
+We assume that the criminal who has access to the bank account is intending to take out the funds of that account as quickly as possible as well as that he intends to do that in few large transactions because with each transaction the risk increases that the fraud gets discovered and the account gets frozen.
+
+With our trade amount limit we have already a partial protection against that fraud scheme but we would like to increase the security by having additionally a verification scheme for the age of the bank account.
+To protect users privacy we use a hashing scheme and only the other trading peer who will receive anyway the payment details during the trade process is able to verify that the provided hash in the offer matches the real account data.
+
+== Overview
+
+The idea for that scheme was already discussed on the Bisq Forum [1].
+
+This proposal is only relevant to Fiat payment accounts as with Altcoin accounts risks for charge-back does not exist.
+
+When a user makes his first trade with a certain Fiat payment account (e.g. SEPA, Zelle,...) the trade statistics object which gets distributed by the Bisq P2P network and contains not-personally identifying data about the trade (e.g. price, date, currency,...) contains a new optional field for the hash of the payment account combined with a random integer (salt).
+
+```saltedHashOfPaymentAccount = Sha256(payment account data + salt)```
+
+The salt value will be persisted with the user object. The traders will only add the hash at the first trade.
+We propose an age of 2 months to be considered safe. It seems very unlikely that a stolen bank account will not get discovered for such a long period.
+When the user has never traded or if their account age is less than 2 months their trade amount will be limited.
+
+We suggest following limits:
+1. Account never used in trade: 25% of the default limit (e.g. 0.125 BTC for a default limit of 0.5 BTC)
+2. Trade age < 1 months: 50% of the default limit (e.g. 0.25 BTC for a default limit of 0.5 BTC)
+3. Trade age 1 - 2 months: 75% of the default limit (e.g. 0.375 BTC for a default limit of 0.5 BTC)
+4. Trade age > 2 months: Default limit will be applied (e.g. 0.5 BTC)
+
+Please note that in future the trade amount limits will be probably derived from the current market price and the target will be likely about 1000 USD.
+
+When creating an offer the maker will add the hash to the offer and potential takers get displayed the trust level (by look up if that hash was already used in one of the trade statistic objects).
+
+
+== Protection against gaming the model
+
+We need to be sure that the date of the trade in the statistics object cannot be back-dated by a malicious trader.
+The trade statistics data are published by both traders and need to match the relevant data. In case one trader would manipulate the trade date the other peers trade statistics data which is visible in the P2P network would make the conflict detectable and would let the take -offer attempt fail. The date of both traders statistic object is slightly different (local date of traders at take offer time) and we allow a tolerance window of 24 hours.
+
+As the P2P network is based on eventual consistency it might be the case that one of the 2 objects will not be visible in the P2P network. In such cases the cross check with both objects cannot be done, but this will be very difficult to abuse as one trader has no control over the peers P2P network connectivity and he would only be able to back-date if his object alone gets published.
+It could be also the case that both objects don't get published which would render the first trade invisible for our purpose. The next trade will then likely be more successful. Though the P2P network is pretty reliable and we don't count with such issues to become a problem, but the check for determining if a trade is the first trade and the hash should be added need to check if the trade statistics data have been successfully broadcasted.
+
+Implementation detail:
+Currently only the maker publishes the trade statistics data and at startup both traders will re-publish their trades again. We will change that so that both the maker and taker will publish at the take offer process and remove the re-publishing. We have to take care that the trade statistic objects contains different signatures and signing keys as well the trade date is slightly different.
+
+To avoid that a malicious user makes a self trade with both clients back-dated we reject trade statistic objects which are older than 1 day from getting added to the local trade statistic list and from further broadcasting.
+
+Another thing to take in account is that a maker cannot "steal" the hash of another offer. But as the data will be verified in the take offer process by both traders the take-offer attempt would fail in such a case.
+
+
+== User perspective
+
+From a user perspective the changes are only visible in the create offer screen, take offer screen and the offerbook.
+The trade amount limits are reflected and feedback will be provided if the user tries to use higher amounts as his trust level permits.
+The user icon in the offerbook will contain an additional colored sub-icon for representing the trust level (account age).
+
+4 different icons for the 4 states will be used:
+
+1. Account never used in trade
+2. Trade age < 1 months
+3. Trade age 1 - 2 months
+4. Trade age > 2 months
+
+
+== Non goals
+
+The scheme could be used for providing more information like number of trades and accumulated trade amount as discussed in the Forum thread [1].
+We don't consider that this would add extra security to the model because a stolen bank account scammer could do several trades and it does not give much of additional protection but decreases privacy of the traders.
+
+
+== Migration process
+
+We don't want to disrupt the trade experience for existing traders by reducing the trade amount limit to the lowest trust level when we publish that update.
+For that reason we will deploy in 2 stages.
+First we support the publishing of the hash in the trade statistics objects for the trades the user does after the update.
+That way active traders can achieve a trust level before the next update will be released which would contain the trade amount limitation based on account age.
+In that second update the trade amount limitation will be activated. This update will be deployed after 2 months after the first release.
+To avoid disruption for traders who have not traded in that period we might use less radical values for the trade amount reduction (e.g. instead 25% for new users use 50%). In a follow up update we could then adjust the percentage values as intended. That should provide a smooth update experience.
+
+Implementation detail:
+The trade amount limit is part of the OfferPayload so it is flexible with changes in updates and the value at offer creation time will be taken for both traders even if the hard coded value would have changed in an update and one of the traders have not updated yet.
+With our new rules for trade amount limit based on account age we need to make sure we stay flexible in future updates with changed parameters as well.
+We suggest to add the percentage values for trade amount reduction and the account age values for determining trust level upgrades to the offer payload as well.
+
+
+== References
+
+* [1] https://forum.bisq.io/t/new-requirement-for-payment-accounts-with-charge-back-risk/2376/65
