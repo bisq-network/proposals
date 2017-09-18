@@ -33,7 +33,10 @@ This proposal is only relevant to Fiat payment accounts as with Altcoin accounts
 
 When a user makes his first trade with a certain Fiat payment account (e.g. SEPA, Zelle,...) the trade statistics object which gets distributed by the Bisq P2P network and contains not-personally identifying data about the trade (e.g. price, date, currency,...) contains a new optional field for the hash of the payment account combined with a random integer (salt).
 
-```saltedHashOfPaymentAccount = Sha256(payment account data + salt)```
+[source,java]
+----
+saltedHashOfPaymentAccount = Sha256(payment account data + salt)
+----
 
 The salt value will be persisted with the user object. The traders will only add the hash at the first trade.
 We propose an age of 2 months to be considered safe. It seems very unlikely that a stolen bank account will not get discovered for such a long period.
