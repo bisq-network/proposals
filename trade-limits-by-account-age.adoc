@@ -43,6 +43,7 @@ We propose an age of 2 months to be considered safe. It seems very unlikely that
 When the user has never traded or if their account age is less than 2 months their trade amount will be limited.
 
 We suggest following limits:
+
 . Account never used in trade: 25% of the default limit (e.g. 0.125 BTC for a default limit of 0.5 BTC)
 . Trade age < 1 months: 50% of the default limit (e.g. 0.25 BTC for a default limit of 0.5 BTC)
 . Trade age 1 - 2 months: 75% of the default limit (e.g. 0.375 BTC for a default limit of 0.5 BTC)
