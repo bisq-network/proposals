@@ -26,7 +26,7 @@ With our trade amount limit we have already a partial protection against that fr
 
 == Overview
 
-The idea for that scheme was already discussed on the link:https://forum.bisq.io/t/new-requirement-for-payment-accounts-with-charge-back-risk/2376/65[Bisq Forum][1].
+The idea for that scheme was already discussed on the link:https://forum.bisq.io/t/new-requirement-for-payment-accounts-with-charge-back-risk/2376/65[Bisq Forum [1\]].
 
 This proposal is only relevant for Fiat payment accounts as with Altcoin accounts risks for chargeback does not exist.
 
@@ -182,7 +182,7 @@ We suggest to add the percentage values for trade amount reduction and the accou
 
 == Non goals
 
-The scheme could be used for providing more information like number of trades and accumulated trade amount as discussed in the link:https://forum.bisq.io/t/payment-account-age-based-trade-amount-limits/2948[Forum thread]. We don't consider that this would add extra security to the model because a stolen bank account scammer could do several trades and it does not give much of additional protection but decreases privacy of the traders.
+The scheme could be used for providing more information like number of trades and accumulated trade amount as discussed in the link:https://forum.bisq.io/t/payment-account-age-based-trade-amount-limits/2948[Forum thread [1\]]. We don't consider that this would add extra security to the model because a stolen bank account scammer could do several trades and it does not give much of additional protection but decreases privacy of the traders.
 
 == References
 
