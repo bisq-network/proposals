@@ -186,4 +186,4 @@ The scheme could be used for providing more information like number of trades an
 
 == References
 
-link:https://forum.bisq.io/t/payment-account-age-based-trade-amount-limits/2948[\[1\] Forum thread]
+link:https://forum.bisq.io/t/payment-account-age-based-trade-amount-limits/2948[[1] Forum thread]
