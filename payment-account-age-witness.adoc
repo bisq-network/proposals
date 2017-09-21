@@ -1,0 +1,185 @@
+== Payment account age witness
+:toc:
+
+....
+  Bisq-IP: 2
+  Layer: Exchange
+  Title: Payment account age witness
+  Author: Manfred Karrer <mk@nucleo.io>
+  Comments-Summary: No comments yet.
+  Comments-URI: link:https://forum.bisq.io/t/payment-account-age-based-trade-amount-limits/2948[Forum thread]
+  Status: Draft
+  Created: 2017-09-14
+  License: GPL Version 3
+....
+
+== Abstract
+
+This proposal describes a verification model for the age of the first trade with a certain payment account as protection against a fraud scheme in which a criminal has obtained illegal access of a foreign bank account and tries to buy Bitcoin with the stolen funds.
+
+The victim of the stolen bank account will likely contact his bank and initiate a bank charge-back.
+The Bitcoin seller would in such a case be at risk to lose the received payment in Fiat currency.
+
+We assume that the criminal who has access to the bank account is intending to take out the funds of that account as quickly as possible as well as that he intends to do that in few large transactions because with each transaction the risk increases that the fraud gets discovered and the account gets frozen.
+
+With our trade amount limit we have already a partial protection against that fraud scheme but we would like to increase the security by having additionally a verification scheme for the age of the bank account. To protect users privacy we use a hashing scheme and only the other trading peer who will receive anyway the payment details during the trade process is able to verify that the provided hash in the offer matches the real account data.
+
+== Overview
+
+The idea for that scheme was already discussed on the link:https://forum.bisq.io/t/new-requirement-for-payment-accounts-with-charge-back-risk/2376/65[Bisq Forum].
+
+This proposal is only relevant for Fiat payment accounts as with Altcoin accounts risks for chargeback does not exist.
+
+We propose an age of 2 months to be considered safe. It seems very unlikely that a stolen bank account will not get discovered for such a long period. When the user has never traded or if their account age is less than 2 months their trade amount will be limited.
+
+We suggest following limits:
+
+. Account never used in trade: 25% of the default limit (e.g. 0.125 BTC for a default limit of 0.5 BTC)
+. Trade age < 1 months: 50% of the default limit (e.g. 0.25 BTC for a default limit of 0.5 BTC)
+. Trade age 1 - 2 months: 75% of the default limit (e.g. 0.375 BTC for a default limit of 0.5 BTC)
+. Trade age > 2 months: Default limit will be applied (e.g. 0.5 BTC)
+
+Please note that in future the trade amount limits will be probably derived from the current market price and the target will be likely about 1000 USD.
+
+When creating an offer the maker will add the hash to the offer and potential takers get displayed the trust level (by look up if that hash was already used in one of the trade statistic objects).
+
+
+== AgeWitness
+
+When a user makes his *first trade* with a certain Fiat payment account (e.g. SEPA, Zelle,...) he publishes a new object (we call it AgeWitness) to the P2P network.
+
+The reason why we separate that into a new data structure and don't use the already existing trade statistics data structure is because in future trade statistic data might get pruned once the historical data gets too large. We don't want to be exposed to the complexity introduced in future pruning solutions nor do we want to add constraints. We can assume that the AgeWitness data will never become that large that pruning will become an issue.
+
+
+=== AgeWitness data object
+
+The AgeWitness object contains a hash, a signature, the pubKey and the tradeDate. The hash gets created by Sha256 with using the input of the ageWitnessInputData concatenated with a 256 bytes salt. The ageWitnessInputData is the smallest set of uniquely identifying payment account data (e.g. concatenated IBAN and BIC as byte array). We don't use the complete payment account data because we don't want to break an existing ageWitness by minor changes like changing the holder name (e.g. adding middle name).
+
+We add also a signature of the hash and the public key for enabling verification that the AgeWitness data cannot be used by anyone else (see <<hijacking>>). The application wide 1024 bit DSA signing key is used. Signature algorith is "SHA256withDSA".
+
+The tradeDate must not be older than 1 day compared to the actual date of any peer who receives the object. If the data is too old it the AgeWitness object will be rejected. With that we protect against back-dating fraud (see <<back-dating>>). We allow such a large time tolerance because clocks might be out of sync and the the relevant periods are rather long (1 month, 2 months).
+
+----
+    // class PaymentAccountAgeWitnessService
+    public PaymentAccountAgeWitness getPaymentAccountWitness(PaymentAccount paymentAccount, Trade trade) throws CryptoException {
+        byte[] ageWitnessInputData = paymentAccount.getAgeWitnessInputData();
+        byte[] salt = paymentAccount.getSalt();
+        final byte[] combined = ArrayUtils.addAll(ageWitnessInputData, salt);
+        byte[] hash = Sha256Hash.hash(combined);
+        byte[] signature = Sig.sign(keyRing.getSignatureKeyPair().getPrivate(), hash);
+        long tradeDate = trade.getTakeOfferDate().getTime();
+        return new PaymentAccountAgeWitness(hash,
+                keyRing.getPubKeyRing().getSignaturePubKeyBytes(),
+                signature,
+                tradeDate);
+    }
+
+    // getAgeWitnessInputData at example class SepaAccount
+    public byte[] getAgeWitnessInputData() {
+        return ArrayUtils.addAll(getIban().getBytes(), getBic().getBytes());
+    }
+
+    // Util for getting salt
+    public static byte[] getSalt(int size) {
+        byte[] salt = new byte[size];
+        new SecureRandom().nextBytes(salt);
+        return salt;
+    }
+
+    // VO class PaymentAccountAgeWitness contains:
+    private final byte[] hash;
+    private final byte[] pubKeyBytes;
+    private final byte[] signaturePubKeyBytes;
+    private final long tradeDate;
+----
+
+
+=== AgeWitness propagation
+
+The salt value will be persisted with the payment account object. The trader will *only publish the AgeWitness object at the first trade*!
+
+The AgeWitness data will be stored locally at each user and distributed in the P2P network. At each new release we will ship the actual data set as resource file to the application to avoid that new users need to download the complete history. This follows the same model as it is used for the trade statistic data.
+
+When a node receives a AgeWitness it verifies that the tradeDate is not older than 1 day compared with the local time of the node.
+
+
+=== Limitated reliability
+
+As the P2P network is based on eventual consistency it might be the case that a broadcast might not be well propagated and lost.
+To check for such rare cases the trader will re-broadcast his AgeWitness object after 1 minute. Thought it might be that he closews his application and the rebroadcast would fail. Combined with the uncertainty when he will start up again and the check for back-dated objects we have no easy way to make sure the object gets published.
+The peer will though not store his AgeWitness object locally but only broadcast and only stores once he receives it from other peers.
+When doing a trade the application checks if the payment account has already an existing AgeWitness object and if not it will treat that trade as the first trade and broadcast the AgeWitness with it.
+So in the worst case his first trade did not succeed to successfully broadcast the AgeWitness but the following trade should succeed.
+
+Side note: The P2P network data is signed by the publisher so it is not possible for a malicious trader to change foreign data.
+
+
+=== Offer
+
+The maker of an offer will add the hash used in the AgeWitness object to his offer. If he has no AgeWitness yet he leaves it empty.
+
+Each user can see in the offerbook additional information representing the age of the account used in that offer.
+
+But because the salt is not known nobody can verify the data if the maker is really the owner of that AgeWitness. This is not problematic because the verification will be done at the take offer process once someone takes the offer.
+
+
+=== Verification
+
+When a trader takes an offer the users exchange in the trade process a nonce, a singature of the nonce, the pubKey and the salt for the hash used in the AgeWitness. With that data the other peer can verify that the other is the owner of the AgeWitness data and that the account data hash is correct with the account data used for the trade. The date can be verified as well and is used to set the permitted trade limit. Any violation of those rules would lead to a failure of the trade.
+
+
+== Gaming the model
+
+=== Broadcasting a back-dated AgeWitness object [[back-dating]]
+
+We need to be sure that the date of the trade in the AgeWitness object cannot be back-dated by a malicious trader. To achieve that any node will reject AgeWitness objects which are older than 1 day.
+
+
+=== Hijacking a forgeign AgeWitness [[hijacking]]
+
+A more tricky fraud approach is an attemtp of hijacking someone else's AgeWitness and payment account to gain the benefit of an already aged account.
+
+A malicious trader could make a trade with someone who has already an old account and takes the account data of that trader (it is enough to take the min. set of uniquely identifying payment account data like IBAN+BIC) to use it for an own account. That fake account can only be used for buying BTC because for selling he would not receive the Fiat money but the user from where he has "stolen" the data. Because he has traded with the peer he has his salt as well so the verification of account data + salt can be achieved. To protect against such an hijacking attempt we use also the signarure check. Only the one who has the private key can create a signature matching a pubKey. In the take offer process we will add a signature validation where the peer sends a nonce and the signed nonce to the peer. The peer can verify with the pubKey that the signature is correct and that the pubKey matches the one in the AgeWitness data.
+
+
+=== Self trade
+
+Any user could make a self trade with using a second application. This does not cause any risk because he proves that he is in posession of the payment accout data (IBAN, BIC) and that is all we want to proof. If the trade was done with another user or not is not relevant here.
+
+
+== User perspective
+
+From a user perspective the changes are visible in the create offer screen, take offer screen, the offerbook and the payment account. The trade amount limits are reflected and feedback will be provided if the user tries to use higher amounts as his trust level permits. The user icon in the offerbook will contain an additional colored sub-icon for representing the trust level (account age).
+
+4 different icons for the 4 states will be used:
+
+. Account never used in trade
+. Trade age < 1 months
+. Trade age 1 - 2 months
+. Trade age > 2 months
+
+
+== Migration process
+
+We don't want to disrupt the trade experience for existing traders by reducing the trade amount limit to the lowest trust level when we publish that update. For that reason we will deploy that feature in 2 stages.
+
+1. First stage
+We support the publishing of the AgeWitness objects for the trades the user does after the update. That way active traders can achieve a trust level before the next update will be released which would contain the trade amount limitation based on account age.
+
+We need to deactivate the verification in the trade process to avoid that users with older version cannot trade with users who have updated.
+
+
+2. Second stage
+In a second update the trade amount limitation will be activated. This update will be deployed after 2 months after the first release.
+
+In the second stage we enable the verification as well. From that moment on users who have not updated to one of the last 2 updates cannot trade with updated users. We need to make sure that such failed verification will not result in failed trades and lost trade fees.
+
+To avoid disruption for traders who have not traded in that period we might use less radical values for the trade amount reduction (e.g. instead 25% for new users use 50%). In a follow up update we could then adjust the percentage values as intended. That should provide a smooth update experience.
+
+Implementation detail: The trade amount limit is part of the OfferPayload so it is flexible with changes in updates and the value at offer creation time will be taken for both traders even if the hard coded value would have changed in an update and one of the traders have not updated yet. With our new rules for trade amount limit based on account age we need to make sure we stay flexible in future updates with changed parameters as well.
+We suggest to add the percentage values for trade amount reduction and the account age values for determining trust level upgrades to the offer payload as well.
+
+
+== Non goals
+
+The scheme could be used for providing more information like number of trades and accumulated trade amount as discussed in the link:https://forum.bisq.io/t/payment-account-age-based-trade-amount-limits/2948[Forum thread]. We don't consider that this would add extra security to the model because a stolen bank account scammer could do several trades and it does not give much of additional protection but decreases privacy of the traders.
