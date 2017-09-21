@@ -41,23 +41,24 @@ We suggest following limits:[[limits]]
 . Trade age 1 - 2 months: 75% of the default limit (e.g. 0.375 BTC for a default limit of 0.5 BTC)
 . Trade age > 2 months: Default limit will be applied (e.g. 0.5 BTC)
 
-Please note that in future the trade amount limits will be probably derived from the current market price and the target will be likely about 1000 USD.
+_Please note that in future the trade amount limits will be probably derived from the current market price and the target will be likely about 1000 USD._
 
 
 == AgeWitness
 
 When a user makes his *first trade* with a certain Fiat payment account (e.g. SEPA, Zelle,...) he publishes a new object (we call it AgeWitness) to the P2P network.
 
-The reason why we separate that into a new data structure and don't use the already existing trade statistics data structure is because in future, trade statistic data might get pruned once the historical data gets too large. We don't want to be exposed to the complexity introduced in future pruning solutions nor do we want to add constraints to that pruning. We can assume that the AgeWitness data will never become that large that pruning will become necessary.
+_Side note:
+The reason why we separate that into a new data structure and don't use the already existing trade statistics data structure is because in future, trade statistic data might get pruned once the historical data gets too large. We don't want to be exposed to the complexity introduced in future pruning solutions nor do we want to add constraints to that pruning. We can assume that the AgeWitness data will never become that large that pruning will become necessary._
 
 
 === AgeWitness data object
 
-The AgeWitness object contains a hash, a signature, the pubKey and the tradeDate. The hash gets created by Sha256, using as input the ageWitnessInputData concatenated with a 256 bytes salt. The ageWitnessInputData is the smallest set of uniquely identifying payment account data (e.g. concatenated IBAN and BIC). We don't use the complete payment account data because we don't want to break an existing ageWitness by minor changes like changing the holder name (e.g. adding middle name).
+The AgeWitness object contains a hash, a signature, the pubKey and the tradeDate. The hash gets created with Sha256. Input is the ageWitnessInputData concatenated with a 256 bytes salt. The ageWitnessInputData is the smallest set of uniquely identifying payment account data (e.g. concatenated IBAN and BIC). We don't use the complete payment account data because we don't want to break an existing ageWitness by minor changes like changing the holder name (e.g. adding middle name).
 
 We add also a signature of the hash and the public key for assuring that the AgeWitness data cannot be used by anyone else (see: <<hijacking>>). The application wide 1024 bit DSA signing key is used. Signature algorith is "SHA256withDSA".
 
-The tradeDate must not be older than 1 day compared to receiving peer's actual date. If the data is too old the AgeWitness object will get rejected. With that we protect against back-dating attempts (see: <<back-dating>>). We allow a rather large tolerance because computer clocks might be out of sync and the relevant periods are rather long (1 month, 2 months), so the max. gain of 1 day is negligible.
+The tradeDate must not be older than 1 day compared to receiving peer's local date. If the data is too old the AgeWitness object will get rejected. With that we protect against back-dating attempts (see: <<back-dating>>). We allow a rather large tolerance because computer clocks might be out of sync and the relevant periods are rather long (1 month, 2 months), so the max. gain from an abuse of that tolerance window of 1 day is negligible.
 
 ----
     // class PaymentAccountAgeWitnessService
@@ -96,49 +97,51 @@ The tradeDate must not be older than 1 day compared to receiving peer's actual d
 
 === AgeWitness propagation
 
-The salt value will be persisted with the payment account object. The trader will *only publish the AgeWitness object at the first trade*!
+The salt value will be locally persisted with the payment account object. The trader will *only publish the AgeWitness object at the first trade*!
 
-The AgeWitness data will be stored locally at each user and distributed in the P2P network. At each new release we will ship the actual data set as resource file (e.g. `EntryMap_BTC_MANINET`) to the application to avoid that new users need to download the complete history. This follows the same model as it is used for the trade statistic data.
+The AgeWitness data will be distributed in the P2P network and stored locally at each user. At each new release we will ship the actual data set as resource file (e.g. `EntryMap_BTC_MANINET`) to the application to avoid that new users need to download the complete history. This follows the same model as it is used for the trade statistic data.
 
-When a node receives a AgeWitness it verifies that the tradeDate is not older than 1 day compared with the local time of the node.
+When a node receives a AgeWitness it verifies that the tradeDate is not older than 1 day compared with the local time of the node, otherwise it will reject the data.
 
 
 ==== Eventual consistency
 
 As the P2P network is based on eventual consistency it might be the case that a broadcast might not be well propagated and the AgeWitness lost.
-To check for such rare cases the trader will re-broadcast his AgeWitness object after 1 minute. Thought it might be that he closes his application in the meantime and thus the rebroadcast would fail. Due we don't know when he will start up again (might be after 1 day) and the check for back-dated objects we have no easy way to make sure the object gets published.
+To mitigate such rare cases the trader will re-broadcast his AgeWitness object after 1 minute. Thought it might be that he closes his application in the meantime before the rebroadcast would happen. As we don't know when he will start up again (might be after 1 day) we cannot rebroadcast simply at the next startup as that might get rejected because of the back-dating protection check.
 
-To mitigate such cases the peer will not store his AgeWitness object locally before he received it from other peers, thus getting a higher confidence that the object got well propagated.
-
-When executing a trade the application checks if for the payment account already exists an AgeWitness object and if not, it will treat that new trade as the first trade and broadcast the AgeWitness with it. In the worst case his first trade did not succeed to propagate the AgeWitness but the following trade will likely succeed. We consider that an acceptable solution.
+To mitigate such cases the peer will not store his AgeWitness object locally before he received it from other peers, thus getting a higher confidence that the object got well propagated. When executing a trade the application checks if an AgeWitness object for the payment account already exists and if not, it will treat that new trade as the first trade and broadcast the AgeWitness with it. In the worst case his first trade did not succeed to propagate the AgeWitness but the following trade will likely succeed. We consider that an acceptable solution.
 
 
 === Offer
 
-The maker of an offer will add the hash used in the AgeWitness object matching the offers payment account to his offer. If he has no AgeWitness yet he leaves it empty. Each offer contains the ID of one specific payment account (we don't support multiple accounts for the same payment method).
+The maker of an offer will add the hash used in the AgeWitness object matching the offers payment account to his offer. If he has no AgeWitness yet he leaves it empty.
 
-Each user can see in the offerbook additional information representing the age of the account used in that offer. The trade limit is derived from that age.
+The age of the offer's payment account will be visually displayed in teh offerbook, as well as the trade limit.
 
-At that stage nobody can verify if the hash is matching the real payment account. But this is not problematic because the verification will be done at the take offer process once someone takes the offer. A fraudulent offer cannot be taken.
+At that stage nobody can verify if the hash is matching the real payment account. But this is not problematic because the verification will be done once someone takes the offer. A fraudulent offer would cause a failure in the take offer process.
 
+_Side note:
+Each offer contains the ID of one specific payment account (we don't support multiple accounts for the same payment method)._
 
 === Verification
 
 When a trader takes an offer both users are exchanging in the trade process a signed nonce, the pubKey and the salt for the hash used in the AgeWitness. With that data the other peer can verify that the other trader is the owner of the AgeWitness data and that the hash is matching the account data used for the trade. The date can be verified as well and is used to set the permitted trade limit. Any violation of those rules would lead to a failed trade (before the deposit transaction gets created - trading fees would be lost).
+
+As the date of both users will differ at least sightly we use a tolerance window to avoid problems with edge cases. E.g. The maker send the taker his local date and his AgeWitness. The taker can evaluate the age and the trade limit and verify if the makers offer is inside that limit. The same in the other direction, the maker verifies with the takers local date and AgeWitness his age and limit. The exchanges local dates must not be diverging further than 1 day.
 
 
 == Gaming the scheme
 
 === Broadcasting a back-dated AgeWitness object [[back-dating]]
 
-We need to be sure that the date of the trade in the AgeWitness object cannot be back-dated by a malicious trader. To achieve that any node will reject AgeWitness objects which are older than 1 day.
+We need to be sure that the date of the trade in the AgeWitness object cannot be back-dated by a malicious trader. To achieve that, any node will reject AgeWitness objects which are older than 1 day. Additionally such a misbehaviour will trigger a ban on the network connection layer.
 
 
 === Hijacking a foreign AgeWitness [[hijacking]]
 
 A more advanced fraud approach would be an attempt of hijacking someone else's AgeWitness and payment account to gain the benefit of an already aged account.
 
-A malicious trader could make a trade with someone who has already an old account and takes the account data of that trader (it is enough to take the min. set of uniquely identifying payment account data like IBAN + BIC) to use it for an own account. That fake account can only be used for buying BTC because for selling he would not receive the Fiat money but the user from where he has "stolen" the data. Because he has traded with the peer he has his salt as well so the verification of account data + salt would not detect that fraud. To protect against such an hijacking attempt is the reason why we use the signed nonce to proof ownership. Without the private key the fraudster cannot create a signature matching the public key in the AgeWitness.
+A malicious trader could make a trade with someone who has already an old account and takes the account data of that trader (it is enough to take the min. set of uniquely identifying payment account data like IBAN + BIC) to use it for an own account. That fake account can only be used for buying BTC because for selling he would not receive the Fiat money but the user from where he has "stolen" the data. Because he has traded with the peer he has his salt as well so the verification of account data + salt would not detect that fraud. To protect against such an hijacking attempt we use the signed nonce to proof ownership of the AgeWitness data. Without the private key the fraudster cannot create a signature matching the public key in the AgeWitness.
 
 
 === Self trade
@@ -151,7 +154,7 @@ Any user could make a self trade with using a second application. This does not 
 All P2P network data is signed by the data owner (publisher) thus it is not possible for a malicious node to change foreign data.
 
 
-== User perspective
+== User interface
 
 From a user perspective the changes are visible in the create offer screen, take offer screen, the offerbook and the payment account. The trade amount limits are reflected and feedback will be provided if the user tries to use higher amounts as his trust level permits. The user icon in the offerbook will contain an additional colored sub-icon for representing the trust level (account age).
 
@@ -163,24 +166,25 @@ From a user perspective the changes are visible in the create offer screen, take
 . Trade age > 2 months
 
 
-== Migration process
+== Update and migration process
 
 We don't want to disrupt the trade experience for existing traders by reducing the trade amount limit to the lowest trust level when we publish that update. Also existing offers would get rendered invalid.
 
-We will use the version number available in the existing offers to detect if the new rules should be applied or not. We don't want to use a protocol version change because that would prevent that offers created with older versions cannot be taken by users who have updated.
+We will use the version number available in the existing offers to detect offers created with older versions. We don't want to use a protocol version change because that would prevent that offers created with older versions cannot be taken by users who have updated.
 
-To enable a smooth transition and don't penalize users who update with lower trade limits we deploy in 3 stages:
+To accomplish a smooth transition and don't penalize users who update they are restricted to lower trade limits (interpreted as new users) we deploy in 3 stages:
 
-. First stage +
-We support the publishing of the AgeWitness objects for the trades the user does after the update. That way active traders can achieve a trust level before the next update after 2 months will be released which would contain the trade amount limitation based on account age. We deactivate the verification in the trade process as well as the display of trade limitations in the UI.
+. First stage: +
+We support the publishing of the AgeWitness objects for the first trade the user makes after the update. That way active traders can achieve a trust level before the next update after 2 months will be released which would contain the trade amount limitation based on account age. We deactivate the verification in the trade process as well as the display of trade limitations in the UI.
 
-. Second stage +
-In a second update the verification and trade amount limitation will be activated. This update will be deployed after 2 months after the first release. In the second stage we enable the verification as well as enable the display of the trade limitations in the UI.
+. Second stage: +
+In a second update the verification and trade amount limitation as well as the display of the trade limitations in the UI will be be activated. This update will be deployed 2 months after the first release (or later).
 
-. Third stage +
-After another 2 months the next update will also apply the rules to old offers. Offer which have not been taken after 4 months can be considered as not very likely to get taken ever. Those offers cannot be taken anymore from users are running the new version. We need to apply that otherwise it would be an attack vector to use an old software version to circumvent the new rules.
+. Third stage: +
+After another 2 months the next update will also apply the rules to old offers. It can be considered that offer which have not been taken after 4 months likely don't get taken ever. Those offers cannot be taken anymore from users running the new version. We need to apply that hard cut, otherwise it would be an attack vector to use an old software version to circumvent the new rules.
 
-_Implementation detail: The trade amount limit is part of the OfferPayload so it is flexible with changes in updates and the value at offer creation time will be taken for both traders even if the hard coded value would have changed in an update and one of the traders have not updated yet. With our new rules for trade amount limit based on account age we need to make sure we stay flexible in future updates with changed parameters as well. We suggest to add the percentage values for trade amount reduction and the account age values for determining trust level upgrades to the offer payload as well._
+_Implementation detail: +
+The trade amount limit is part of the OfferPayload so it is flexible with changes in updates and the value at offer creation time will be taken for both traders even if the hard coded value would have changed in an update and one of the traders have not updated yet. With our new rules for trade amount limit based on account age we need to make sure we stay flexible in future updates with changed parameters as well. We suggest to add the percentage values for trade amount reduction and the account age values for determining trust level upgrades to the offer payload as well._
 
 
 == Non goals
