@@ -22,7 +22,7 @@ The Bitcoin seller would in such a case be at risk to lose the received payment 
 
 We *assume* that the criminal who has access to the bank account is intending to take out the funds of that account as quickly as possible as well as that he intends to do that in few large transactions because with each transaction the risk increases that the fraud gets discovered and the account gets frozen.
 
-With our trade amount limit we have already a partial protection against that fraud scheme but we would like to increase the security by having additionally a verification scheme for the age of the bank account.
+With our *trade amount limit* we have already a partial protection against that fraud scheme but we would like to increase the security by having additionally a verification scheme for the *age of the bank account*.
 
 To protect users privacy we use a hashing scheme and only the other trading peer who will receive anyway the payment details during the trade process is able to verify that the provided hash in the offer matches the real account data.
 
@@ -34,7 +34,7 @@ This proposal is only relevant for Fiat payment accounts as with Altcoin account
 
 We propose an account age of 2 months to be considered safe. It seems very unlikely that a stolen bank account will not get discovered for such a long period. When the user has never traded or if their account age is less than 2 months their trade amount will be limited.
 
-We suggest following limits:[[limits]]
+We suggest following limits:
 
 . Account never used in trade: 25% of the default limit (e.g. 0.125 BTC for a default limit of 0.5 BTC)
 . Trade age < 1 months: 50% of the default limit (e.g. 0.25 BTC for a default limit of 0.5 BTC)
