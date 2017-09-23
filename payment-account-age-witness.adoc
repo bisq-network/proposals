@@ -15,7 +15,7 @@
 
 == Abstract
 
-This proposal describes a verification model for the age of the first trade with a certain payment account as protection against a fraud scheme in which a criminal has obtained illegal access of a foreign bank account and tries to buy Bitcoin with the stolen funds.
+This proposal describes a verification model for the age of the first trade with a certain payment account as protection against a fraud scheme in which a criminal has obtained illegal access of a bank account and tries to buy Bitcoin with the stolen funds.
 
 The victim of the stolen bank account will likely contact his bank and initiate a bank chargeback.
 The Bitcoin seller would in such a case be at risk to lose the received payment in Fiat currency.
@@ -24,11 +24,11 @@ We *assume* that the criminal who has access to the bank account is intending to
 
 With our *trade amount limit* we have already a partial protection against that fraud scheme but we would like to increase the security by having additionally a verification scheme for the *age of the bank account*.
 
-To protect users privacy we use a hashing scheme and only the other trading peer who will receive anyway the payment details during the trade process is able to verify that the provided hash in the offer matches the real account data.
+To protect users privacy we use a hashing scheme and only the other trading peer - who will receive anyway the payment details during the trade process - is able to verify that the provided hash in the offer matches the real account data.
 
 == Overview
 
-The basic idea for that scheme was already discussed on the link:https://forum.bisq.io/t/new-requirement-for-payment-accounts-with-chargeback-risk/2376/65[Bisq Forum [1\]].
+The basic idea for this scheme was already discussed on the link:https://forum.bisq.io/t/new-requirement-for-payment-accounts-with-chargeback-risk/2376/65[Bisq Forum [1\]].
 
 This proposal is only relevant for Fiat payment accounts as with Altcoin accounts risks for chargeback does not exist.
 
@@ -54,9 +54,9 @@ The reason why we separate that into a new data structure and don't use the alre
 
 === AgeWitness data object
 
-The AgeWitness object contains a hash, a signature, the pubKey and the tradeDate. The hash gets created with Sha256. Input is the ageWitnessInputData concatenated with a 256 bytes salt. The ageWitnessInputData is the smallest set of uniquely identifying payment account data (e.g. concatenated IBAN and BIC). We don't use the complete payment account data because we don't want to break an existing ageWitness by minor changes like changing the holder name (e.g. adding middle name).
+The AgeWitness object contains a hash, a signature, the pubKey and the tradeDate. The hash gets created with Sha256. Input is the ageWitnessInputData concatenated with a 256 bit salt. The ageWitnessInputData is the smallest set of uniquely identifying payment account data (e.g. concatenated IBAN and BIC). We don't use the complete payment account data because we don't want to break an existing ageWitness by minor changes like changing the holder name (e.g. adding middle name).
 
-We add also a signature of the hash and the public key for assuring that the AgeWitness data cannot be used by anyone else (see: <<hijacking>>). The application wide 1024 bit DSA signing key is used. Signature algorith is "SHA256withDSA".
+We add also a signature of the hash and the public key for assuring that the AgeWitness data cannot be used by anyone else (see: <<hijacking>>). The application wide 1024 bit DSA signing key is used. Signature algorithm is "SHA256withDSA".
 
 The tradeDate must not be older than 1 day compared to receiving peer's local date. If the data is too old the AgeWitness object will get rejected. With that we protect against back-dating attempts (see: <<back-dating>>). We allow a rather large tolerance because computer clocks might be out of sync and the relevant periods are rather long (1 month, 2 months), so the max. gain from an abuse of that tolerance window of 1 day is negligible.
 
@@ -99,7 +99,7 @@ The tradeDate must not be older than 1 day compared to receiving peer's local da
 
 The salt value will be locally persisted with the payment account object. The trader will *only publish the AgeWitness object at the first trade*!
 
-The AgeWitness data will be distributed in the P2P network and stored locally at each user. At each new release we will ship the actual data set as resource file (e.g. `EntryMap_BTC_MANINET`) to the application to avoid that new users need to download the complete history. This follows the same model as it is used for the trade statistic data.
+The AgeWitness data will be distributed in the P2P network and stored locally at each user. At each new release we will ship the actual data set as resource file (e.g. `EntryMap_BTC_MAINNET`) to the application to avoid that new users need to download the complete history. This follows the same model as it is used for the trade statistic data.
 
 When a node receives a AgeWitness it verifies that the tradeDate is not older than 1 day compared with the local time of the node, otherwise it will reject the data.
 
@@ -146,7 +146,7 @@ A malicious trader could make a trade with someone who has already an old accoun
 
 === Self trade
 
-Any user could make a self trade with using a second application. This does not cause any risk because he proves that he is in possession of the payment account data (IBAN, BIC) and that is all we want to proof. If the trade was done with another user or not is not relevant here.
+Any user could make a self trade with using a second application. This does not cause any risk because he proves that he is in possession of the payment account data (IBAN, BIC) and that is all we want to proof. If the trade was done with another user or not is not relevant here. Our basic assumption is that a fraudster does not want to wait a few months until he can use the stolen account for cashing out as he risks that the fraud get detected in the meantime.
 
 
 === Changing a foreign AgeWitness
@@ -164,6 +164,11 @@ From a user perspective the changes are visible in the create offer screen, take
 . Trade age < 1 months
 . Trade age 1 - 2 months
 . Trade age > 2 months
+
+
+=== Salt management
+
+If the user changes his payment account or start over with a new application we need to support that he can re-use the salt he used with a certain bank account. One option would be to add an extra field in the payment account setup screen where the user can add a past salt (otherwise the app generates a random salt).
 
 
 == Update and migration process
