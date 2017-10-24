@@ -131,13 +131,10 @@ When a trader takes an offer both users are exchanging in the trade process the 
 ==== Verification steps
 1. Check if witness date is after release date for that feature (v. 0.6)
 2. Check if peers date is inside 1 day tolerance window
-3. Verify witness hash with data delivered by peer: ageWitnessInputData (from payment account), salt, pubKey
-4. If the user is the taker, verify if the offers trade limit is less or equal to the peers (makers) calculated trade limit (he could have gained a better limit in the meantime since offer has been created but not a worse one)
+3. Verify if witness hash matches hash created from the data delivered by peer (ageWitnessInputData, salt, pubKey)
+4. Check if peers trade limit calculated with its account age is not lower than the trade amount.
 5. Verify if signature of the predefined input data (offer ID or preparedDepositTx) is correct using the peers pubKey.
 
-//TODO missing taker check
-
-The trade amount is already checked that it cannot be more then the trade limit as part of the normal offer verification. So the check if the offers trade limit is
 
 _Note: By using offer ID and preparedDepositTx for the nonce we avoid the need for a challenge protocol. We have chosen data which are defined by the other peer so they cannot be manipulated._
 
