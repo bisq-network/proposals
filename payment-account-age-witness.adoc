@@ -181,8 +181,8 @@ We don't want to disrupt the trade experience for existing traders by reducing t
 To fade in that feature we use a date based approach.
 
 * Before December, 15, 2017 (about 1.5 months after release) we don't apply the lower limit based on the account age.
-* After that date and before January, 15, 2018 we apply a factor of 0.9 to the default limit for accounts which are 30-60 days old and 0.75 to those which are less then 30 days old.
-* After that date and before February, 15 2018 we apply a factor of 0.75 to the default limit for accounts which are 30-60 days old and 0.5 to those which are less then 30 days old.
+* After that date and before January, 15, 2018 we only apply a factor of 0.75 to those which are less then 30 days old. Accounts which are 30-60 days old are not affected (no reduction).
+* After that date and before February, 15, 2018 we apply a factor of 0.75 to the default limit for accounts which are 30-60 days old and 0.5 to those which are less then 30 days old.
 * After February, 15, 2018 we apply the target factor of 0.5 to the default limit for accounts which are 30-60 days old and 0.25 to those which are less then 30 days old.
 
 Offers which are not containing the accountAgeWitness hash (created before v.0.6) will become invalid after February 2018. That is required because we need to prevent that it is possible to circumvent the account age verification scheme.
