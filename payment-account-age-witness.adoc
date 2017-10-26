@@ -55,18 +55,16 @@ The AccountAgeWitness object contains a hash and the date of publishing.
     private final long date;                        // 8 byte
 ----
 
-The hash is created with Sha256 and wrapped into a Ripemd160 hash to get a 20 byte hash instead of 32 bytes as it would be with Sha256.
-Input for the hash is a concatenation of the ageWitnessInputData (e.g. IBAN), a 256 bit salt and the pubKey.
-The ageWitnessInputData is the smallest set of uniquely identifying payment account data (e.g. concatenated IBAN and BIC). We don't use the complete payment account data because we don't want to break an existing ageWitness by minor changes like changing the holder name (e.g. adding middle name).
-The public key is used in the verification process to check the signature which will get passed in the trade process. That will assure that the AccountAgeWitness data cannot be used by anyone else (see: <<hijacking>>). The application wide 1024 bit DSA signing key is used. Signature algorithm is "SHA256withDSA".
+The hash is created with Sha256 and wrapped into a Ripemd160 hash to get a 20 byte hash instead of 32 bytes as it would be with Sha256. Input for the hash is a concatenation of the ageWitnessInputData (e.g. IBAN), a 256 bit salt and the pubKey.
+The ageWitnessInputData is the smallest set of uniquely identifying payment account data (e.g. concatenated IBAN and BIC). We don't use the complete payment account data because we don't want to break an existing ageWitness by minor changes like changing the holder name (e.g. adding middle name). The public key is used in the verification process to check the signature which will get passed in the trade process. That will assure that the AccountAgeWitness data cannot be used by anyone else (see: <<hijacking>>). The application wide 1024 bit DSA signing key is used. Signature algorithm is "SHA256withDSA".
 
 The salt value will be locally persisted with the payment account object.
 
 The date must not be older or newer than 1 day compared to a receiving peer's local date. If the date is outside of that tolerance range the AccountAgeWitness object will get ignored and not further broadcasted. With that check we protect against back-dating attempts (see: <<back-dating>>). We allow a rather large tolerance because computer clocks might be out of sync and the relevant periods are rather long (30 or 60 days), so the max. gain from an abuse of that tolerance window of 1 day is negligible.
 
-That AccountAgeWitness data structure results in 28 bytes per item but as we use Protobuffer there is some overhead added which results in 33 bytes per data item.
-If we store 1 000 000 AccountAgeWitness objects we would have about 33 MB of data. The data are locally persisted and with every release we ship the latest state in a resource file. That helps that new users don't need to retrieve all data from the P2P network. We also use a diff when requesting so we only request the missing data from the seed node at startup.
-If the data would become too large we can consider a time to live mechanism where AccountAgeWitness objects need to get triggered with a refresh message to stay active. That way outdated objects which have not received any TTL signal since a long period (e.g. 6 months) would get pruned.
+That AccountAgeWitness data structure results in 28 bytes per item but as we use Protobuffer there is some overhead added which results in 33 bytes per data item. If we store 1 000 000 AccountAgeWitness objects we would have about 33 MB of data. The data are locally persisted and with every release we ship the latest state in a resource file. That helps that new users don't need to retrieve all data from the P2P network. We also use a diff when requesting so we only request the missing data from the seed node at startup.
+
+__Note: If the data would become too large we can consider a time to live mechanism where AccountAgeWitness objects need to get triggered with a refresh message to stay active. That way outdated objects which have not received any TTL signal since a long period (e.g. 6 months) would get pruned.__
 
 ----
     // class AccountAgeWitnessService
@@ -155,8 +153,8 @@ A malicious trader could make a trade with someone who has already an old accoun
 
 === Changing a foreign AccountAgeWitness
 
-The AccountAgeWitness data are appended in a data structure which is only protected by checking if the date in the AccountAgeWitness object is not older or newer than 1 day compared to the current date of the local node. Once data is stored there it cannot be altered. It uses the AccountAgeWitness hash as key in a hash map.
-There is no way to change an already broadcasted AccountAgeWitness object.
+The AccountAgeWitness data are appended in a data structure which is only protected by checking if the date in the AccountAgeWitness object is not older or newer than 1 day compared to the current date of the local node. Once data is stored there it cannot be altered. It uses the AccountAgeWitness hash as key in a hash map. There is no way to change an already broadcasted AccountAgeWitness object.
+
 One sophisticated attack could be to alter the date in an AccountAgeWitness to a far future date thus occupying the map entry by the hash and preventing the originator of the data to get propagated his real account age. To prevent that we check that the date is also not **newer** than 1 day. So worst an attacker could do is to fake ones AccountAgeWitness date by 1 day to past or future. That will not have any effects as we use a 1 day tolerance window at the verification.
 
 === Using an old version to avoid that the account age based trade limit gets applied
@@ -166,10 +164,7 @@ To avoid that a user might stick with an old version we will stop support of pre
 
 == User interface
 
-From a user perspective the changes are visible in the create offer screen, take offer screen, the offerbook and the payment account. The trade amount limits are reflected and feedback will be provided if the user tries to take an offer with a higher amount as his account age permits. The user icon in the offerbook will contain a colored ring around the icon representing the account age. The tooltip and the peer info box (opens when clicking the icon) will add textual information about the account age.
-Offers with a min. trade amount exceeding the users account age based limit are greyed out and on click the user gets a popup displayed with information why he cannot take that offer.
-The create offer and take offer screens have the trade amount input validators adjusted to reflect the trade limit.
-In the payment account screen the user can see the age, the limit and the salt.
+From a user perspective the changes are visible in the create offer screen, take offer screen, the offerbook and the payment account. The trade amount limits are reflected and feedback will be provided if the user tries to take an offer with a higher amount as his account age permits. The user icon in the offerbook will contain a colored ring around the icon representing the account age. The tooltip and the peer info box (opens when clicking the icon) will add textual information about the account age. Offers with a min. trade amount exceeding the users account age based limit are greyed out and on click the user gets a popup displayed with information why he cannot take that offer. The create offer and take offer screens have the trade amount input validators adjusted to reflect the trade limit. In the payment account screen the user can see the age, the limit and the salt.
 
 
 === Salt management
@@ -184,10 +179,11 @@ __Note:The display and setting of the salt should be moved to an advanced option
 We don't want to disrupt the trade experience for existing traders by reducing the trade amount limit to the lowest level when we publish that update. Also existing offers would get rendered invalid.
 
 To fade in that feature we use a date based approach.
-Before December, 15, 2017 (about 1.5 months after release) we don't apply the lower limit based on the account age.
-After that date and before January, 15, 2018 we apply a factor of 0.9 to the default limit for accounts which are 30-60 days old and 0.75 to those which are less then 30 days old.
-After that date and before February, 15 2018 we apply a factor of 0.75 to the default limit for accounts which are 30-60 days old and 0.5 to those which are less then 30 days old.
-After February, 15, 2018 we apply the target factor of 0.5 to the default limit for accounts which are 30-60 days old and 0.25 to those which are less then 30 days old.
+
+* Before December, 15, 2017 (about 1.5 months after release) we don't apply the lower limit based on the account age.
+* After that date and before January, 15, 2018 we apply a factor of 0.9 to the default limit for accounts which are 30-60 days old and 0.75 to those which are less then 30 days old.
+* After that date and before February, 15 2018 we apply a factor of 0.75 to the default limit for accounts which are 30-60 days old and 0.5 to those which are less then 30 days old.
+* After February, 15, 2018 we apply the target factor of 0.5 to the default limit for accounts which are 30-60 days old and 0.25 to those which are less then 30 days old.
 
 Offers which are not containing the accountAgeWitness hash (created before v.0.6) will become invalid after February 2018. That is required because we need to prevent that it is possible to circumvent the account age verification scheme.
 
