@@ -1,0 +1,158 @@
+= API to enable automated trading
+:toc:
+
+....
+  Bisq-IP: 1
+  Layer: External
+  Title: API to enable automated trading
+  Author: Mike Rosseel <mike.rosseel@gmail.com>
+  Comments-Summary: No comments yet.
+  Comments-URI: TODO
+  Status: Draft
+  Created: 2017-09-13
+  License: GPL Version 3
+....
+
+== Abstract
+
+Every successful trade in Bisq needs a minimum of 6 manual interventions:
+
+* make offer
+* take offer
+* payment started
+* payment received
+* move funds to wallet of maker
+* move funds to wallet of taker
+
+In this proposal a mechanism is described to automate this process, thereby eliminating
+all manual interventions needed to conclude a trade successfully.
+
+
+== Goals
+
+The immediate goal of this proposal is to offer an API that enables automation of crypto -> crypto
+trades.
+
+NOTE: Fiat pairs can also be automated, but because there aren't many banks currently offering
+their own API's this proposal will not focus on it.
+
+== Overview
+
+The API module will be a separate module which will depend on the core Bisq modules.
+This module will be hosted in a separate repository.
+
+There are 2 interfaces in the API module:
+
+* Bisq \<\=> internal API
+* internal API \<\=> HTTP API
+
+This decoupling is important for two reasons: decouple the HTTP API from Bisq changes and make it easy to add other API's if needed such as JSON RPC, protobuffer, ... .
+
+== Example API
+
+....
+GET /api/v1/account_list
+GET /api/v1/currency_list
+GET /api/v1/market_list
+GET /api/v1/offer_list
+GET /api/v1/offer_detail
+DELETE /api/v1/offer_cancel
+GET /api/v1/offer_make
+GET /api/v1/offer_take
+GET /api/v1/trade_detail
+GET /api/v1/trade_list
+GET /api/v1/payment_started
+GET /api/v1/payment_received
+GET /api/v1/move_funds_to_bisq_wallet
+GET /api/v1/wallet_detail
+GET /api/v1/wallet_addresses
+GET /api/v1/wallet_tx_list
+....
+
+Some of these calls will have further parameters to customize the responses, these parameters will not be documented in this proposal.
+
+== Example usage
+
+To show how to use this API, this section will give high-level examples
+on how to create a simple maker and taker trading bot.
+
+These examples presume that your bisq has been set up with the necessary
+accounts, and that there's enough bitcoin to pay fees, use as collateral,
+sell, ... .
+
+=== Trading bot: Selling BTC for XMR
+
+* Gather info
+** collect all active bisq accounts using */account_list*
+** select the XMR _account_id_ by parsing the account_list result
+** get the current offers, using */offer_list*. A bot could use this information to decide on the best offer price.
+** optionally: get external prices for bitcoin and XMR
+* Make offer
+** use the _account_id_ and the XMR/BTC pair to create an offer using */offer_create*.
+Use either an external price, a price derived from the other Bisq offers or use a % distance from the Bisq price.
+* Detect Offer take
+** check the state of your offer using the _offer_id_ and wait till it's taken, using */offer_detail*
+** check that in the */trade_list* result, a trade with your _offer_id_ is present.
+* Advance trade
+** using an external blockchain explorer or full node, determine when the XMR payment
+has arrived to advance the payment using */payment_received*
+* Withdraw
+** the XMR is in your own wallet, but you can withdraw the trading collateral
+ using */move_funds_to_bisq_wallet*
+
+=== Trading bot: Buying BTC for XMR (taking the offer created by the previous bot)
+
+* Gather info
+** collect all active bisq accounts using */account_list*
+** select the XMR _account_id_ by parsing the account_list result
+** get the current offers, using */offer_list*. A bot could use this information to decide on the best offer price.
+** optionally: get external prices for bitcoin and XMR
+* Take offer
+** use the _offer_id_ and the XMR/BTC pair to create an offer using */offer_take*.
+* Detect Trade id
+** check that in the */trade_list* result, a trade with your _offer_id_ is present, store this as _trade_id_.
+* Advance trade
+** using an external wallet, pay the required XMR to the address in the trade.
+** call  */payment_started*
+* Withdraw
+** you can withdraw the BTC into your bisq wallet using */move_funds_to_bisq_wallet*
+
+== Technical details
+
+Language:: Java 8 (in line with Bisq project)
+Framework::
+* http://www.dropwizard.io/[Dropwizard] => Java framework for developing ops-friendly, high-performance, RESTful web services
+* https://swagger.io/[Swagger] => tools for the OpenAPI Specification, enables export of the API in a standard format. This in turn allows us to have pretty API docs and autogenerating API clients.
+
+
+== Open issues
+
+* REST vs RPC style HTTP API - currently the proposed API has an RPC style.
+This could be transformed into a REST style API
+
+== Possible future work
+
+Push notifications:: Explore the possibility of providing streaming updates of offers/trades
+similar to how bitcoind (and Monero) does it with Zeromq:
+https://github.com/bitcoin/bitcoin/blob/master/doc/zmq.md
+
+Security:: this API is meant for local consumption only, and should not be exposed
+to the internet. That being said, there are possibilities to enable this use-case.
+Dropwizard supports both Basic Authentication and OAuth2, and software such as
+nginx can be used as a (secured) proxy for the local API.
+
+Mobile app:: these API's could be used to enable a Bisq mobile app, given that
+the security is implemented.
+
+== Glossary
+
+API:: a set of functions and procedures that allow the creation of applications which access the features or data of an operating system, application, or other service.
+REST:: REST or RESTful web services is a way of providing interoperability between computer systems on the Internet. See https://en.wikipedia.org/wiki/Representational_state_transfer[REST wikipedia entry].
+RPC::  Remote Procedure call, https://en.wikipedia.org/wiki/Remote_procedure_call
+
+== References
+
+* https://github.com/dan-da/bitsquare/blob/rpc_api/doc/api/README.md
+* https://swagger.io/[Swagger]
+* https://swagger.io/swagger-codegen/[Swagger code generation]
+* https://en.wikipedia.org/wiki/Representational_state_transfer[REST wikipedia entry]
