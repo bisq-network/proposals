@@ -1,3 +1,0 @@
-= Bisq network proposals
-
-https://github.com/bitcoin/bips[BIP]-style improvement proposals.
