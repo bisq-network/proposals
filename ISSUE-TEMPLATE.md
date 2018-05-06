@@ -1,1 +1,1 @@
-<!-- Please read and follow the instructions at https://docs.bisq.network/proposals.html -->
+> _This is a Bisq Network proposal. Please familiarize yourself with the [submission and review process](https://docs.bisq.network/proposals.html)._
